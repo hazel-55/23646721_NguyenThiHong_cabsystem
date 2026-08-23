@@ -168,4 +168,19 @@ quadrantChart
 ## B7: USECASE DIAGRAM
 ![usecase diagram](./img/usecase_diagram.jpg)
 
-
+---
+## B8: ĐẶC TẢ USECASE
+| | |
+| :--- | :--- |
+| **Tên use case:** | **Đặt xe** |
+| **Actor:** | Khách hàng |
+| **Mô tả:** | Cho phép khách hàng tạo yêu cầu chuyến đi bằng cách nhập điểm đón, điểm đến và loại xe; hệ thống sau đó tự động tìm tài xế phù hợp |
+| **Tiền điều kiện (Precondition):** | Khách hàng đã đăng nhập và hiện không có chuyến đi đang thực . |
+| **Hậu điều kiện (Postcondition):** | Yêu cầu đặt xe được tạo và tài xế phù hợp được phân công |
+| **Luồng sự kiện chính (Basic flow)** | |
+| **Actor: Người dùng** | **Hệ thống** |
+| 1. Nhập điểm đón, điểm đến và chọn loại xe. | 2. Tính toán khoảng cách, hiển thị danh sách xe và cước phí dự kiến. |
+| 3. Nhấn nút "Đặt xe". | 4. Ghi nhận yêu cầu, tạo mã chuyến đi với trạng thái "Đang tìm tài xế". |
+| **Luồng sự kiện thay thế (Alternate flow)** | |
+| 1a. Nhập địa chỉ ngoài khu vực phục vụ của hệ thống. | 1b. Hiển thị thông báo "Khu vực chưa được hỗ trợ" và chặn thao tác đặt xe. |
+| | 4a. Quá thời gian chờ (Timeout) không tìm được tài xế: Hệ thống hủy tìm kiếm, thông báo cho khách hàng thử lại sau. |
