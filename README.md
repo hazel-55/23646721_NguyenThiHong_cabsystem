@@ -166,6 +166,6 @@ quadrantChart
 
  ---
 ## B7: USECASE DIAGRAM
-
+![usecase diagram](./img/usecase_diagram.jpg)
 
 
