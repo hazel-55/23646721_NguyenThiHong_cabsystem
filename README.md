@@ -170,17 +170,131 @@ quadrantChart
 
 ---
 ## B8: ĐẶC TẢ USECASE
+### Đặc tả UseCase Đặt xe
 | | |
 | :--- | :--- |
 | **Tên use case:** | **Đặt xe** |
 | **Actor:** | Khách hàng |
-| **Mô tả:** | Cho phép khách hàng tạo yêu cầu chuyến đi bằng cách nhập điểm đón, điểm đến và loại xe; hệ thống sau đó tự động tìm tài xế phù hợp |
-| **Tiền điều kiện (Precondition):** | Khách hàng đã đăng nhập và hiện không có chuyến đi đang thực . |
-| **Hậu điều kiện (Postcondition):** | Yêu cầu đặt xe được tạo và tài xế phù hợp được phân công |
+| **Mô tả:** | Cho phép khách hàng tạo yêu cầu chuyến đi bằng cách nhập điểm đón, điểm đến và loại xe; hệ thống sau đó tự động tìm tài xế phù hợp. |
+| **Tiền điều kiện (Precondition):** | Khách hàng đã đăng nhập và đang không thực hiện chuyến xe nào. |
+| **Hậu điều kiện (Postcondition):** | Yêu cầu đặt xe được tạo và tài xế phù hợp được phân công. |
 | **Luồng sự kiện chính (Basic flow)** | |
 | **Actor: Người dùng** | **Hệ thống** |
-| 1. Nhập điểm đón, điểm đến và chọn loại xe. | 2. Tính toán khoảng cách, hiển thị danh sách xe và cước phí dự kiến. |
-| 3. Nhấn nút "Đặt xe". | 4. Ghi nhận yêu cầu, tạo mã chuyến đi với trạng thái "Đang tìm tài xế". |
+| 1. Chọn chức năng Đặt xe. | 2. Hiển thị giao diện đặt xe. |
+| 3. Nhập điểm đón và điểm đến. | 4. Kiểm tra địa điểm chuyến đi. |
+| | 5. Hiển thị khoảng cách và giá tiền ứng với từng loại phương tiện. |
+| 6. Chọn loại xe mong muốn và chọn phương thức thanh toán mặc định (Tiền mặt). | |
+| 7. Nhấn tìm chuyến. | 8. Tạo yêu cầu chuyến và hiển thị trạng thái đang tìm tài xế. |
+| | 9. Hiển thị thông báo đã tìm thấy tài xế. |
+| | 10. Cập nhật trạng thái chuyến và thông báo thông tin tài xế cho khách hàng. |
 | **Luồng sự kiện thay thế (Alternate flow)** | |
-| 1a. Nhập địa chỉ ngoài khu vực phục vụ của hệ thống. | 1b. Hiển thị thông báo "Khu vực chưa được hỗ trợ" và chặn thao tác đặt xe. |
-| | 4a. Quá thời gian chờ (Timeout) không tìm được tài xế: Hệ thống hủy tìm kiếm, thông báo cho khách hàng thử lại sau. |
+| | 4.1 Nếu thông tin địa chỉ không hợp lệ, hiển thị thông báo "Không tìm thấy vị trí" và yêu cầu khách hàng nhập lại thông tin. |
+| 6.1 Khách hàng chọn phương thức thanh toán là Ví điện tử/Thẻ ngân hàng. | 6.2 Ghi nhận phương thức thanh toán |
+| | 6.3 Quay lại bước 7. |
+| | 8.1 Nếu không tìm thấy tài xế trong thời gian quy định (Timeout), hiển thị thông báo "Không tìm thấy tài xế cho chuyến đi này, vui lòng thử lại sau". |
+| 8.2 Nhấn Đồng ý. | 8.3 Quay về bước 2. |
+
+### Đặc tả UseCase Nhận chuyến đi
+| | |
+| :--- | :--- |
+| **Tên use case:** | **Nhận chuyến đi** |
+| **Actor:** | Tài xế |
+| **Mô tả:** | Tài xế nhận được yêu cầu điều phối chuyến đi từ hệ thống và thao tác chấp nhận để bắt đầu phục vụ khách hàng. |
+| **Tiền điều kiện (Precondition):** | Tài xế đã đăng nhập, đang bật trạng thái "Sẵn sàng nhận chuyến" và nằm trong bán kính quét của hệ thống. |
+| **Hậu điều kiện (Postcondition):** | Chuyến đi được gán chính thức cho tài xế; hệ thống ngừng phát yêu cầu cho tài xế khác. |
+| **Luồng sự kiện chính (Basic flow)** | |
+| **Actor: Người dùng** | **Hệ thống** |
+| | 1. Hiển thị thông báo yêu cầu nhận chuyến trên màn hình tài xế (gồm: khoảng cách, điểm đón, điểm đến, giá cước) kèm đồng hồ đếm ngược. |
+| 2. Nhấn nút "Chấp nhận" trong khoảng thời gian quy định. | 3. Ghi nhận tài xế cho chuyến đi và ngừng gửi yêu cầu này cho các tài xế khác. |
+| | 4. Cập nhật trạng thái chuyến thành "Tài xế đang đến". |
+| | 5. Mở màn hình bản đồ điều hướng cho tài xế đi đến điểm đón. |
+| **Luồng sự kiện thay thế (Alternate flow)** | |
+| 2.1 Nhấn nút "Từ chối" hoặc bỏ qua để hết thời gian nhận chuyến. | 2.2 Thu hồi yêu cầu trên thiết bị tài xế hiện tại. |
+| | 2.3 Tự động chuyển yêu cầu tìm chuyến cho tài xế phù hợp tiếp theo.|
+
+### Đặc tả UseCase Cập nhật trạng thái chuyến đi
+| | |
+| :--- | :--- |
+| **Tên use case:** | **Cập nhật trạng thái chuyến đi** |
+| **Actor:** | Tài xế |
+| **Mô tả:** | Tài xế thao tác trên ứng dụng để cập nhật tiến độ của chuyến đi theo thời gian thực (đã đến, đang chạy, hoàn thành). |
+| **Tiền điều kiện (Precondition):** | Tài xế đã nhận chuyến thành công và đang trên đường đến điểm đón. |
+| **Hậu điều kiện (Postcondition):** | Chuyến đi kết thúc, hệ thống chốt số tiền cước phí cuối cùng và chuyển sang luồng thanh toán. |
+| **Luồng sự kiện chính (Basic flow)** | |
+| **Actor: Người dùng** | **Hệ thống** |
+| 1. Nhấn nút "Đã đến điểm đón" khi tới nơi. | 2. Ghi nhận thời gian và gửi thông báo "Tài xế đã đến" cho khách hàng. |
+| 3. Nhấn nút "Bắt đầu chuyến" sau khi khách hàng lên xe. | 4. Cập nhật trạng thái chuyến thành "Đang di chuyển" và bắt đầu ghi nhận lộ trình thực tế. |
+| 5. Nhấn nút "Hoàn thành chuyến" khi đến điểm đích. | 6. Ghi nhận chuyến đi kết thúc, chốt số tiền cước phí cuối cùng và hiển thị hóa đơn tổng hợp. |
+| **Luồng sự kiện thay thế (Alternate flow)** | |
+|  |  |
+
+### Đặc tả UseCase Hủy chuyến
+| | |
+| :--- | :--- |
+| **Tên use case:** | **Hủy chuyến** |
+| **Actor:** | Khách hàng, Tài xế |
+| **Mô tả:** | Người dùng thao tác hủy yêu cầu đặt xe khi chuyến đi chưa bắt đầu di chuyển. |
+| **Tiền điều kiện (Precondition):** | Chuyến đi đang ở trạng thái chờ tài xế hoặc "Tài xế đang đến" (chưa bấm Bắt đầu chuyến). |
+| **Hậu điều kiện (Postcondition):** | Chuyến đi bị hủy bỏ, hệ thống giải phóng tài xế để nhận cuốc mới. |
+| **Luồng sự kiện chính (Basic flow)** | |
+| **Actor: Người dùng** | **Hệ thống** |
+| 1. Chọn chức năng "Hủy chuyến". | 2. Hiển thị danh sách các lý do hủy chuyến và yêu cầu xác nhận. |
+| 3. Chọn lý do hủy và nhấn nút "Xác nhận". | 4. Cập nhật trạng thái chuyến thành "Đã hủy" và lưu lý do vào cơ sở dữ liệu. |
+| | 5. Gửi thông báo hủy chuyến cho bên còn lại (nếu đã có tài xế nhận chuyến). |
+| | 6. Đặt lại trạng thái tài xế thành "Sẵn sàng". |
+| **Luồng sự kiện thay thế (Alternate flow)** | |
+| | |
+
+
+### Đặc tả UseCase Thanh toán
+| | |
+| :--- | :--- |
+| **Tên use case:** | **Thanh toán chuyến đi** |
+| **Actor:** | Khách hàng (vai trò tiếp nhận), Hệ thống |
+| **Mô tả:** | Hệ thống tự động xử lý thanh toán cước phí sau khi chuyến đi hoàn thành dựa trên phương thức khách hàng đã chọn. |
+| **Tiền điều kiện (Precondition):** | Chuyến đi đã được tài xế cập nhật trạng thái là "Hoàn thành". Hệ thống đã chốt số tiền cước phí cuối cùng. |
+| **Hậu điều kiện (Postcondition):** | Giao dịch được ghi nhận thành công, chuyến đi đóng lại và chuyển sang luồng đánh giá dịch vụ. |
+| **Luồng sự kiện chính (Basic flow)** | |
+| **Actor: Người dùng** | **Hệ thống** |
+| | 1. Ghi nhận trạng thái hoàn thành và kiểm tra phương thức thanh toán mặc định (Ví điện tử/Thẻ). |
+| | 2. Tự động gửi request trừ tiền (chứa số tiền và mã giao dịch) đến Cổng thanh toán (Payment Gateway). |
+| | 3. Nhận phản hồi "Thành công" từ Cổng thanh toán. |
+| | 4. Cập nhật trạng thái chuyến đi thành "Đã thanh toán". |
+| 5. Xem hóa đơn điện tử tự động hiển thị và chuyển sang màn hình Đánh giá tài xế. | |
+| **Luồng sự kiện thay thế (Alternate flow)** | |
+| 1.1 Phương thức thanh toán được thiết lập là "Tiền mặt". | 1.2 Hiển thị thông báo cho khách hàng: "Vui lòng thanh toán số tiền X cho tài xế". |
+| | 1.3 Hiển thị nút "Xác nhận đã thu đủ tiền" trên màn hình của tài xế. |
+| 1.4 Tài xế nhấn nút "Xác nhận đã thu đủ tiền". | 1.5 Cập nhật trạng thái chuyến đi thành "Đã thanh toán" và kết thúc luồng. |
+| | 2.1 Cổng thanh toán phản hồi "Thất bại" (do thẻ lỗi, số dư không đủ...). |
+| | 2.2 Hiển thị thông báo lỗi thanh toán trên máy khách hàng, yêu cầu nạp thêm tiền, chọn thẻ khác hoặc chuyển sang trả Tiền mặt. |
+| 2.3 Khách hàng chọn phương thức mới và bấm nút "Thanh toán" thủ công. | 2.4 Thực hiện lại luồng gửi request giao dịch ở bước 2. |
+
+
+---
+## B9: PHÂN TÍCH QUY TRÌNH NGHIỆP VỤ (Business Process)
+### 1. Quy trình Đặt xe và Điều phối
+Khách hàng nhập điểm đón, điểm đến và loại xe -> Hệ thống tính toán cước phí dự kiến -> Khách hàng bấm "Đặt xe" -> Hệ thống quét và lọc danh sách tài xế khả dụng (dựa trên vị trí và trạng thái) -> Hệ thống gửi yêu cầu nhận chuyến (Ride Offer) cho tài xế phù hợp nhất kèm đếm ngược thời gian -> Tài xế bấm "Chấp nhận" -> Hệ thống gán chuyến đi cho tài xế -> Hệ thống thông báo thông tin xe và ETA cho Khách hàng -> Chuyển sang Quy trình Thực hiện chuyến đi.
+
+### 2. Quy trình Thực hiện chuyến đi
+Tài xế di chuyển theo bản đồ đến điểm đón -> Tài xế đến nơi, bấm "Đã đến điểm đón" -> Hệ thống thông báo cho Khách hàng ra xe -> Khách hàng lên xe -> Tài xế bấm "Bắt đầu chuyến" -> Hệ thống cập nhật trạng thái "Đang di chuyển" và khóa chức năng hủy chuyến -> Tài xế lái xe đến điểm đích -> Tài xế bấm "Hoàn thành chuyến" -> Hệ thống chốt số tiền cước phí cuối cùng -> Chuyển sang Quy trình Thanh toán.
+
+
+### 3. Quy trình Thanh toán và Đánh giá
+
+**Thanh toán điện tử:**
+Chuyến đi hoàn thành -> Hệ thống kiểm tra phương thức thanh toán là Ví điện tử/Thẻ -> Hệ thống tự động gửi API trừ tiền đến Cổng thanh toán -> Cổng thanh toán trả về kết quả "Thành công" -> Hệ thống đóng giao dịch và hiển thị hóa đơn -> Hệ thống mở màn hình Đánh giá -> Khách hàng chọn số sao và gửi đánh giá -> Hệ thống lưu dữ liệu -> Hoàn tất vòng đời chuyến đi.
+
+**Thanh toán Tiền mặt:** 
+Hệ thống kiểm tra phương thức là Tiền mặt -> Hiển thị số tiền cần thu trên máy Tài xế -> Tài xế thu tiền và bấm "Đã thu đủ" -> Hệ thống đóng giao dịch -> Chuyển sang bước Đánh giá.
+
+---
+## B10: CÁC QUY TẮC NGHIỆP VỤ
+
+| Nhóm Quy tắc | Tên Quy tắc Nghiệp vụ | Nội dung |
+| :--- | :--- | :--- |
+| **Driver & Vehicle Management** | **Điều kiện nhận chuyến** | Tài xế chỉ được hệ thống đưa vào danh sách phân bổ chuyến đi khi thỏa mãn 2 điều kiện: đang bật trạng thái "Sẵn sàng" và hiện không có cuốc xe nào đang thực hiện. |
+| **Booking & Trip Management** | **Giới hạn chuyến đi đồng thời** | Mỗi khách hàng chỉ được phép tạo và duy trì tối đa **01 chuyến đi** đang ở trạng thái kích hoạt (từ lúc đặt đến lúc hoàn thành/hủy) tại một thời điểm. |
+| **Booking & Trip Management** | **Chính sách hủy chuyến** | Khách hàng/Tài xế chỉ được phép hủy khi chuyến ở trạng thái "Đang tìm tài xế" hoặc "Tài xế đang đến". Chức năng hủy bị vô hiệu hóa khi "Bắt đầu chuyến". |
+| **Driver Matching & Dispatch** | **Bán kính quét & Timeout** | Hệ thống quét tìm tài xế khả dụng trong bán kính tối đa **5km** tính từ điểm đón. Khi nhận yêu cầu, tài xế có **60 giây** để phản hồi. Nếu từ chối hoặc hết giờ (timeout), hệ thống tự động chuyển yêu cầu cho tài xế gần tiếp theo. |
+| **Fare & Payment Management** | **Cơ sở tính cước (MVP)** | Giá cước được **tính và chốt cố định ngay tại thời điểm đặt xe** (dựa trên khoảng cách ước tính và đơn giá của loại xe). |
+| **Fare & Payment Management** | **Xử lý giao dịch thất bại** | Nếu thanh toán qua cổng điện tử thất bại (thẻ lỗi, hết tiền), hệ thống chặn việc đóng chuyến và yêu cầu khách hàng **đổi sang phương thức Tiền mặt** (hoặc thử lại thẻ khác) để kết thúc giao dịch. |
