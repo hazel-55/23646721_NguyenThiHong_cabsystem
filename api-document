@@ -1,1 +1,436 @@
+openapi: 3.0.0
+info:
+  title: CAB System API - Full Specification
+  version: 1.1.0
+  description: Tài liệu đặc tả API đầy đủ cho 8 module chức năng của nền tảng đặt xe trực tuyến CAB System.
+servers:
+  - url: https://api.cabsystem.com/v1
+    description: Production Server
 
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "Nhập JWT Token: Bearer <token>"
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ==========================================
+  # 1. AUTHENTICATION & AUTHORIZATION
+  # ==========================================
+  /auth/register:
+    post:
+      summary: Đăng ký tài khoản
+      tags: [1. Authentication]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role: { type: string, enum: [CUSTOMER, DRIVER] }
+                fullName: { type: string }
+                phone: { type: string }
+                password: { type: string }
+              required: [role, fullName, phone, password]
+      responses:
+        '201':
+          description: Đăng ký thành công
+
+  /auth/login:
+    post:
+      summary: Đăng nhập
+      tags: [1. Authentication]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phone: { type: string }
+                password: { type: string }
+              required: [phone, password]
+      responses:
+        '200':
+          description: Thành công trả về Access Token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken: { type: string }
+                  role: { type: string }
+
+  # ==========================================
+  # 2. CUSTOMER MANAGEMENT
+  # ==========================================
+  /customers/me:
+    get:
+      summary: Xem hồ sơ Khách hàng
+      tags: [2. Customer Management]
+      responses:
+        '200':
+          description: Dữ liệu hồ sơ
+    put:
+      summary: Cập nhật hồ sơ Khách hàng
+      tags: [2. Customer Management]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fullName: { type: string }
+                email: { type: string }
+      responses:
+        '200':
+          description: Cập nhật thành công
+
+  /customers/me/trips:
+    get:
+      summary: Xem lịch sử chuyến đi của Khách hàng
+      tags: [2. Customer Management]
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 10 }
+      responses:
+        '200':
+          description: Danh sách các chuyến đã thực hiện
+
+  # ==========================================
+  # 3. DRIVER & VEHICLE MANAGEMENT
+  # ==========================================
+  /drivers/me:
+    get:
+      summary: Xem hồ sơ Tài xế & Phương tiện
+      tags: [3. Driver Management]
+      responses:
+        '200':
+          description: Trả về thông tin tài xế và xe
+    put:
+      summary: Cập nhật thông tin Tài xế & Xe
+      tags: [3. Driver Management]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fullName: { type: string }
+                vehicleInfo:
+                  type: object
+                  properties:
+                    brand: { type: string }
+                    plateNumber: { type: string }
+                    color: { type: string }
+      responses:
+        '200':
+          description: Thành công
+
+  /drivers/me/status:
+    put:
+      summary: Cập nhật trạng thái hoạt động (Sẵn sàng / Nghỉ)
+      tags: [3. Driver Management]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: { type: string, enum: [READY, NOT_READY] }
+      responses:
+        '200':
+          description: Thành công
+
+  /drivers/me/location:
+    put:
+      summary: Cập nhật vị trí hiện tại (Liên tục gửi định kỳ)
+      tags: [3. Driver Management]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lat: { type: number, format: float }
+                lng: { type: number, format: float }
+      responses:
+        '200':
+          description: Đã lưu vị trí
+
+  # ==========================================
+  # 4 & 5. BOOKING, DISPATCH & TRIP MANAGEMENT
+  # ==========================================
+  /trips/estimate:
+    post:
+      summary: Ước tính giá cước và ETA trước khi đặt
+      tags: [4. Booking & Trip]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pickupLat: { type: number }
+                pickupLng: { type: number }
+                dropoffLat: { type: number }
+                dropoffLng: { type: number }
+                vehicleType: { type: string, enum: [BIKE, CAR_4_SEATS, CAR_7_SEATS] }
+      responses:
+        '200':
+          description: Trả về giá tiền dự kiến và thời gian đón
+
+  /trips:
+    post:
+      summary: Tạo yêu cầu đặt xe mới
+      tags: [4. Booking & Trip]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pickupLocation: { type: string }
+                pickupLat: { type: number }
+                pickupLng: { type: number }
+                dropoffLocation: { type: string }
+                dropoffLat: { type: number }
+                dropoffLng: { type: number }
+                vehicleType: { type: string }
+                paymentMethod: { type: string, enum: [CASH, E_WALLET, CARD] }
+      responses:
+        '201':
+          description: Chuyến đi được tạo, hệ thống bắt đầu tìm tài xế
+
+  /trips/{tripId}:
+    get:
+      summary: Theo dõi trạng thái chuyến đi & ETA
+      tags: [4. Booking & Trip]
+      parameters:
+        - in: path
+          name: tripId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Trả về trạng thái, vị trí tài xế hiện tại
+
+  /trips/{tripId}/cancel:
+    post:
+      summary: Khách hàng/Tài xế hủy chuyến
+      tags: [4. Booking & Trip]
+      parameters:
+        - in: path
+          name: tripId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string }
+      responses:
+        '200':
+          description: Hủy thành công (Theo chính sách MVP)
+
+  /driver/trips/{tripId}/accept:
+    post:
+      summary: Tài xế CHẤP NHẬN cuốc xe (Ride Offer)
+      tags: [5. Dispatch]
+      parameters:
+        - in: path
+          name: tripId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Gán tài xế vào chuyến đi thành công
+
+  /driver/trips/{tripId}/reject:
+    post:
+      summary: Tài xế TỪ CHỐI cuốc xe (Hệ thống tìm người khác)
+      tags: [5. Dispatch]
+      parameters:
+        - in: path
+          name: tripId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Từ chối thành công, giải phóng tài xế
+
+  /driver/trips/{tripId}/status:
+    put:
+      summary: Tài xế cập nhật trạng thái thực tế
+      tags: [4. Booking & Trip]
+      parameters:
+        - in: path
+          name: tripId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: 
+                  type: string
+                  enum: [ARRIVED_AT_PICKUP, TRIP_STARTED, TRIP_COMPLETED]
+      responses:
+        '200':
+          description: Trạng thái cập nhật thành công
+
+  /trips/{tripId}/rate:
+    post:
+      summary: Đánh giá tài xế sau chuyến đi
+      tags: [2. Customer Management]
+      parameters:
+        - in: path
+          name: tripId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rating: { type: integer, minimum: 1, maximum: 5 }
+                comment: { type: string }
+      responses:
+        '200':
+          description: Cảm ơn bạn đã đánh giá!
+
+  # ==========================================
+  # 6. FARE & PAYMENT MANAGEMENT
+  # ==========================================
+  /trips/{tripId}/payment:
+    post:
+      summary: Xử lý thanh toán chuyến đi (Hệ thống hoặc Khách hàng gọi)
+      tags: [6. Payment Management]
+      parameters:
+        - in: path
+          name: tripId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Giao dịch được gửi đến Payment Provider thành công
+        '400':
+          description: Thanh toán thất bại (Thẻ lỗi, thiếu tiền)
+
+  /trips/{tripId}/payment/retry:
+    post:
+      summary: Thử lại thanh toán (Retry) khi thanh toán điện tử bị lỗi
+      tags: [6. Payment Management]
+      parameters:
+        - in: path
+          name: tripId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                newPaymentMethod: { type: string, enum: [CASH, E_WALLET, CARD] }
+      responses:
+        '200':
+          description: Retry thành công
+
+  # ==========================================
+  # 7. NOTIFICATION MANAGEMENT
+  # ==========================================
+  /notifications/device-token:
+    post:
+      summary: Đăng ký Device Token để nhận Push Notification
+      tags: [7. Notifications]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                deviceToken: { type: string }
+                platform: { type: string, enum: [IOS, ANDROID, WEB] }
+      responses:
+        '200':
+          description: Đăng ký token thành công
+
+  /notifications:
+    get:
+      summary: Lấy danh sách thông báo in-app
+      tags: [7. Notifications]
+      responses:
+        '200':
+          description: Danh sách thông báo (Booking, Thanh toán, Tài xế đã đến...)
+
+  # ==========================================
+  # 8. OPERATIONS & REPORTING (ADMIN/OPS)
+  # ==========================================
+  /admin/trips:
+    get:
+      summary: "[Ops] Lấy danh sách toàn bộ chuyến đi / Đang diễn ra"
+      tags: [8. Operations & Reporting]
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string }
+          description: Lọc theo trạng thái chuyến (VD ACTIVE, COMPLETED, CANCELLED)
+        - in: query
+          name: dateFrom
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Danh sách chuyến đi hỗ trợ điều phối viên
+
+  /admin/transactions:
+    get:
+      summary: "[Ops] Tra cứu giao dịch thanh toán"
+      tags: [8. Operations & Reporting]
+      parameters:
+        - in: query
+          name: tripId
+          schema: { type: string }
+      responses:
+        '200':
+          description: Lịch sử giao dịch, đối soát dòng tiền
+
+  /admin/reports/dashboard:
+    get:
+      summary: "[Ops] Xem báo cáo thống kê cơ bản"
+      tags: [8. Operations & Reporting]
+      parameters:
+        - in: query
+          name: range
+          schema: { type: string, enum: [TODAY, THIS_WEEK, THIS_MONTH] }
+      responses:
+        '200':
+          description: Trả về số chuyến hoàn thành, tỷ lệ hủy, và tổng doanh thu
