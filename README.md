@@ -298,3 +298,197 @@ Hệ thống kiểm tra phương thức là Tiền mặt -> Hiển thị số ti
 | **Driver Matching & Dispatch** | **Bán kính quét & Timeout** | Hệ thống quét tìm tài xế khả dụng trong bán kính tối đa **5km** tính từ điểm đón. Khi nhận yêu cầu, tài xế có **60 giây** để phản hồi. Nếu từ chối hoặc hết giờ (timeout), hệ thống tự động chuyển yêu cầu cho tài xế gần tiếp theo. |
 | **Fare & Payment Management** | **Cơ sở tính cước (MVP)** | Giá cước được **tính và chốt cố định ngay tại thời điểm đặt xe** (dựa trên khoảng cách ước tính và đơn giá của loại xe). |
 | **Fare & Payment Management** | **Xử lý giao dịch thất bại** | Nếu thanh toán qua cổng điện tử thất bại (thẻ lỗi, hết tiền), hệ thống chặn việc đóng chuyến và yêu cầu khách hàng **đổi sang phương thức Tiền mặt** (hoặc thử lại thẻ khác) để kết thúc giao dịch. |
+
+
+--- 
+## B11: ACCEPTANCE CRITERIA
+
+Acceptance Criteria được xác định dựa trên Business Requirements, Functional Requirements, Use Case, Business Process và Business Rules của CAB System.
+
+### 1. Authentication & Authorization – Xác thực & Phân quyền
+
+| ID             | Acceptance Criteria                                                                                                                                                                          |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **AC-AUTH-01** | **Given** người dùng chưa có tài khoản và thuộc vai trò Customer hoặc Driver, **When** thực hiện đăng ký với thông tin hợp lệ, **Then** hệ thống tạo tài khoản thành công.                   |
+| **AC-AUTH-02** | **Given** người dùng đã có tài khoản, **When** nhập thông tin đăng nhập hợp lệ, **Then** hệ thống xác thực thành công và cho phép truy cập hệ thống.                                         |
+| **AC-AUTH-03** | **Given** người dùng chưa được xác thực, **When** truy cập chức năng yêu cầu đăng nhập, **Then** hệ thống từ chối truy cập.                                                                  |
+| **AC-AUTH-04** | **Given** người dùng đã đăng nhập, **When** truy cập một chức năng trong hệ thống, **Then** hệ thống chỉ cho phép các chức năng phù hợp với vai trò Customer, Driver, Operations hoặc Admin. |
+| **AC-AUTH-05** | **Given** người dùng không có quyền quản trị phù hợp, **When** thực hiện thao tác quản trị nhạy cảm, **Then** hệ thống từ chối thao tác.                                                     |
+
+---
+
+### 2. Customer Management – Quản lý Khách hàng
+
+| ID            | Acceptance Criteria                                                                                                                               |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **AC-CUS-01** | **Given** Customer đã đăng nhập, **When** mở hồ sơ cá nhân, **Then** hệ thống hiển thị thông tin hồ sơ của Customer.                              |
+| **AC-CUS-02** | **Given** Customer đã đăng nhập, **When** cập nhật thông tin cá nhân hợp lệ, **Then** hệ thống lưu thông tin mới và hiển thị dữ liệu đã cập nhật. |
+| **AC-CUS-03** | **Given** Customer có lịch sử chuyến đi, **When** yêu cầu xem lịch sử chuyến, **Then** hệ thống hiển thị danh sách các chuyến của Customer.       |
+| **AC-CUS-04** | **Given** chuyến đi đã hoàn thành, **When** Customer gửi đánh giá tài xế, **Then** hệ thống ghi nhận đánh giá cho tài xế của chuyến đi tương ứng. |
+| **AC-CUS-05** | **Given** chuyến đi chưa hoàn thành, **When** Customer cố gửi đánh giá tài xế, **Then** hệ thống không cho phép đánh giá.                         |
+
+---
+
+### 3. Driver & Vehicle Management – Quản lý Tài xế & Phương tiện
+
+| ID            | Acceptance Criteria                                                                                                                                                          |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **AC-DRV-01** | **Given** Driver đã đăng nhập, **When** xem hồ sơ, **Then** hệ thống hiển thị thông tin tài xế và phương tiện.                                                               |
+| **AC-DRV-02** | **Given** Driver đã đăng nhập, **When** cập nhật thông tin hồ sơ hoặc phương tiện hợp lệ, **Then** hệ thống lưu dữ liệu mới.                                                 |
+| **AC-DRV-03** | **Given** Driver không có chuyến đang thực hiện, **When** chuyển trạng thái sang `"Sẵn sàng"`, **Then** Driver có thể được đưa vào danh sách tìm kiếm tài xế cho chuyến mới. |
+| **AC-DRV-04** | **Given** Driver đang ở trạng thái `"Không sẵn sàng"`, **When** hệ thống tìm tài xế cho booking mới, **Then** Driver không được đưa vào danh sách phân bổ chuyến.            |
+| **AC-DRV-05** | **Given** Driver đang sử dụng hệ thống, **When** gửi vị trí hiện tại, **Then** hệ thống ghi nhận vị trí để phục vụ tìm tài xế và tính ETA.                                   |
+| **AC-DRV-06** | **Given** Driver đang có một chuyến đang thực hiện, **When** hệ thống tìm tài xế cho booking khác, **Then** Driver không được đưa vào danh sách phân bổ.                     |
+
+---
+
+### 4. Booking & Trip Management – Đặt xe & Quản lý Chuyến đi
+
+#### 4.1. Tạo yêu cầu đặt xe
+
+| ID             | Acceptance Criteria                                                                                                                                                                   |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **AC-TRIP-01** | **Given** Customer đã đăng nhập và không có chuyến active, **When** chọn chức năng đặt xe, **Then** hệ thống cho phép Customer tạo booking mới.                                       |
+| **AC-TRIP-02** | **Given** Customer nhập điểm đón và điểm đến hợp lệ, **When** hệ thống kiểm tra địa điểm, **Then** hệ thống hiển thị khoảng cách và giá tiền tương ứng với từng loại phương tiện.     |
+| **AC-TRIP-03** | **Given** Customer nhập điểm đón hoặc điểm đến không hợp lệ, **When** hệ thống kiểm tra địa điểm, **Then** hệ thống hiển thị thông báo `"Không tìm thấy vị trí"` và yêu cầu nhập lại. |
+| **AC-TRIP-04** | **Given** Customer đã nhập điểm đón, điểm đến và chọn loại xe, **When** nhấn `"Tìm chuyến"`, **Then** hệ thống tạo yêu cầu chuyến và chuyển sang trạng thái `"Đang tìm tài xế"`.      |
+| **AC-TRIP-05** | **Given** Customer đang có một chuyến active, **When** cố tạo thêm booking mới, **Then** hệ thống từ chối yêu cầu.                                                                    |
+| **AC-TRIP-06** | **Given** Customer chưa chọn phương thức thanh toán khác, **When** tạo booking, **Then** phương thức thanh toán mặc định là `"Tiền mặt"`.                                             |
+| **AC-TRIP-07** | **Given** Customer chọn Ví điện tử hoặc Thẻ ngân hàng, **When** tiếp tục quá trình booking, **Then** hệ thống ghi nhận phương thức thanh toán được chọn.                              |
+
+#### 4.2. Theo dõi chuyến đi
+
+| ID             | Acceptance Criteria                                                                                                                                        |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **AC-TRIP-08** | **Given** booking đang tìm tài xế, **When** Customer xem thông tin chuyến, **Then** hệ thống hiển thị trạng thái hiện tại của chuyến.                      |
+| **AC-TRIP-09** | **Given** Driver đã nhận chuyến, **When** Customer xem chuyến, **Then** hệ thống hiển thị thông tin Driver được phân công và ETA.                          |
+| **AC-TRIP-10** | **Given** Driver chấp nhận chuyến thành công, **When** hệ thống hoàn tất việc phân công, **Then** trạng thái chuyến được chuyển thành `"Tài xế đang đến"`. |
+
+#### 4.3. Cập nhật trạng thái chuyến đi
+
+| ID             | Acceptance Criteria                                                                                                                                                                |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **AC-TRIP-11** | **Given** Driver đã nhận chuyến và đến điểm đón, **When** Driver chọn `"Đã đến điểm đón"`, **Then** hệ thống ghi nhận thời gian và gửi thông báo `"Tài xế đã đến"` cho Customer.   |
+| **AC-TRIP-12** | **Given** Driver đã đến điểm đón và Customer đã lên xe, **When** Driver chọn `"Bắt đầu chuyến"`, **Then** hệ thống cập nhật trạng thái chuyến thành `"Đang di chuyển"`.            |
+| **AC-TRIP-13** | **Given** chuyến đang ở trạng thái `"Đang di chuyển"`, **When** Driver chọn `"Hoàn thành chuyến"`, **Then** hệ thống ghi nhận chuyến kết thúc và chuyển sang quy trình thanh toán. |
+
+---
+
+### 5. Hủy chuyến
+
+| ID               | Acceptance Criteria                                                                                                                                          |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **AC-CANCEL-01** | **Given** chuyến đang ở trạng thái `"Đang tìm tài xế"`, **When** Customer hoặc Driver yêu cầu hủy chuyến, **Then** hệ thống cho phép thực hiện hủy.          |
+| **AC-CANCEL-02** | **Given** chuyến đang ở trạng thái `"Tài xế đang đến"`, **When** Customer hoặc Driver yêu cầu hủy chuyến, **Then** hệ thống cho phép thực hiện hủy.          |
+| **AC-CANCEL-03** | **Given** chuyến đã ở trạng thái `"Đang di chuyển"`, **When** Customer hoặc Driver cố hủy chuyến, **Then** hệ thống không cho phép hủy.                      |
+| **AC-CANCEL-04** | **Given** người dùng chọn chức năng `"Hủy chuyến"`, **When** hệ thống tiếp nhận yêu cầu, **Then** hệ thống hiển thị danh sách lý do hủy và yêu cầu xác nhận. |
+| **AC-CANCEL-05** | **Given** người dùng đã chọn lý do hủy, **When** nhấn `"Xác nhận"`, **Then** hệ thống cập nhật chuyến thành `"Đã hủy"` và lưu lý do hủy.                     |
+| **AC-CANCEL-06** | **Given** chuyến đã có Driver nhận chuyến, **When** chuyến bị hủy, **Then** hệ thống gửi thông báo hủy cho bên còn lại.                                      |
+| **AC-CANCEL-07** | **Given** Driver đang được phân công cho chuyến vừa bị hủy, **When** quá trình hủy hoàn tất, **Then** hệ thống đặt trạng thái Driver trở lại `"Sẵn sàng"`.   |
+
+---
+
+### 6. Driver Matching & Dispatch – Tìm kiếm & Điều phối Tài xế
+
+| ID            | Acceptance Criteria                                                                                                                                                                                          |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **AC-DIS-01** | **Given** có booking đang ở trạng thái `"Đang tìm tài xế"`, **When** hệ thống thực hiện matching, **Then** chỉ các Driver đang `"Sẵn sàng"` và không có chuyến đang thực hiện được xét.                      |
+| **AC-DIS-02** | **Given** có nhiều Driver đang sẵn sàng, **When** hệ thống lọc danh sách Driver, **Then** chỉ Driver có loại phương tiện phù hợp với yêu cầu booking được giữ lại.                                           |
+| **AC-DIS-03** | **Given** có các Driver phù hợp, **When** hệ thống lọc theo vị trí, **Then** chỉ Driver nằm trong bán kính tối đa **5 km** tính từ điểm đón được xét.                                                        |
+| **AC-DIS-04** | **Given** có nhiều Driver đáp ứng điều kiện, **When** hệ thống sắp xếp danh sách Driver, **Then** Driver gần điểm đón hơn được ưu tiên trước.                                                                |
+| **AC-DIS-05** | **Given** một Driver được hệ thống lựa chọn, **When** hệ thống gửi Ride Offer, **Then** Driver nhận được thông tin gồm khoảng cách, điểm đón, điểm đến, giá cước và thời gian phản hồi.                      |
+| **AC-DIS-06** | **Given** Driver nhận được Ride Offer, **When** Driver chọn `"Chấp nhận"` trong vòng **60 giây**, **Then** hệ thống gán Driver cho chuyến.                                                                   |
+| **AC-DIS-07** | **Given** Driver nhận được Ride Offer, **When** Driver chọn `"Từ chối"`, **Then** hệ thống thu hồi Ride Offer và tiếp tục tìm Driver phù hợp tiếp theo.                                                      |
+| **AC-DIS-08** | **Given** Driver nhận được Ride Offer, **When** Driver không phản hồi sau **60 giây**, **Then** Ride Offer hết hạn và hệ thống tiếp tục tìm Driver phù hợp tiếp theo.                                        |
+| **AC-DIS-09** | **Given** một Driver đã chấp nhận Ride Offer thành công, **When** việc phân công hoàn tất, **Then** hệ thống ngừng gửi yêu cầu của chuyến đó cho Driver khác.                                                |
+| **AC-DIS-10** | **Given** không còn Driver phù hợp trong phạm vi tìm kiếm, **When** quá trình matching kết thúc, **Then** hệ thống thông báo cho Customer `"Không tìm thấy tài xế cho chuyến đi này, vui lòng thử lại sau"`. |
+| **AC-DIS-11** | **Given** Driver hiện tại từ chối hoặc timeout và vẫn còn Driver phù hợp khác, **When** hệ thống tiếp tục matching, **Then** Customer không cần tạo lại booking.                                             |
+
+---
+
+### 7. Fare & Payment Management – Tính cước & Thanh toán
+
+#### 7.1. Thanh toán Tiền mặt
+
+| ID            | Acceptance Criteria                                                                                                                                                               |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **AC-PAY-01** | **Given** chuyến đã hoàn thành và phương thức thanh toán là `"Tiền mặt"`, **When** hệ thống bắt đầu xử lý thanh toán, **Then** hệ thống hiển thị số tiền Customer cần thanh toán. |
+| **AC-PAY-02** | **Given** phương thức thanh toán là `"Tiền mặt"`, **When** hệ thống hiển thị thông tin thanh toán, **Then** Driver có chức năng `"Xác nhận đã thu đủ tiền"`.                      |
+| **AC-PAY-03** | **Given** Driver đã nhận đủ tiền mặt, **When** Driver chọn `"Xác nhận đã thu đủ tiền"`, **Then** hệ thống ghi nhận thanh toán thành công và kết thúc giao dịch.                   |
+
+#### 7.2. Thanh toán điện tử
+
+| ID            | Acceptance Criteria                                                                                                                                                                                            |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **AC-PAY-04** | **Given** chuyến đã hoàn thành và phương thức thanh toán là Ví điện tử hoặc Thẻ, **When** thanh toán được kích hoạt, **Then** hệ thống gửi yêu cầu thanh toán gồm số tiền và mã giao dịch đến Payment Gateway. |
+| **AC-PAY-05** | **Given** Payment Gateway xử lý giao dịch, **When** trả về kết quả `"Thành công"`, **Then** hệ thống cập nhật trạng thái thanh toán thành công và chuyến thành `"Đã thanh toán"`.                              |
+| **AC-PAY-06** | **Given** thanh toán thành công, **When** giao dịch được hoàn tất, **Then** hệ thống hiển thị hóa đơn và chuyển Customer sang luồng đánh giá Driver.                                                           |
+| **AC-PAY-07** | **Given** Payment Gateway xử lý giao dịch, **When** trả về kết quả `"Thất bại"`, **Then** hệ thống ghi nhận thanh toán thất bại và thông báo lỗi cho Customer.                                                 |
+| **AC-PAY-08** | **Given** thanh toán điện tử thất bại, **When** Customer xử lý lại thanh toán, **Then** hệ thống cho phép thử lại bằng phương thức điện tử khác hoặc chuyển sang Tiền mặt.                                     |
+| **AC-PAY-09** | **Given** thanh toán chưa thành công, **When** hệ thống xử lý kết thúc giao dịch, **Then** hệ thống không được ghi nhận giao dịch là đã hoàn tất.                                                              |
+| **AC-PAY-10** | **Given** thanh toán điện tử được thực hiện qua Payment Gateway, **When** hệ thống lưu thông tin giao dịch, **Then** CAB không lưu trực tiếp thông tin thanh toán nhạy cảm của Customer.                       |
+
+---
+
+### 8. Notification Management – Quản lý Thông báo
+
+| ID             | Acceptance Criteria                                                                                                                                           |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **AC-NOTI-01** | **Given** Customer tạo booking thành công, **When** booking được tiếp nhận, **Then** hệ thống gửi thông báo xác nhận cho Customer.                            |
+| **AC-NOTI-02** | **Given** Driver được phân công cho chuyến, **When** quá trình matching thành công, **Then** hệ thống gửi thông tin Driver và trạng thái chuyến cho Customer. |
+| **AC-NOTI-03** | **Given** Driver đã đến điểm đón, **When** Driver cập nhật `"Đã đến điểm đón"`, **Then** Customer nhận được thông báo `"Tài xế đã đến"`.                      |
+| **AC-NOTI-04** | **Given** chuyến được hoàn thành, **When** trạng thái chuyến được cập nhật, **Then** Customer nhận được thông báo liên quan đến việc hoàn thành chuyến.       |
+| **AC-NOTI-05** | **Given** hệ thống nhận được kết quả thanh toán, **When** giao dịch thành công hoặc thất bại, **Then** Customer nhận được thông báo kết quả thanh toán.       |
+| **AC-NOTI-06** | **Given** Driver được chọn trong quá trình dispatch, **When** Ride Offer được tạo, **Then** Driver nhận được thông báo chuyến mới.                            |
+| **AC-NOTI-07** | **Given** có thay đổi liên quan đến chuyến Driver đang thực hiện, **When** sự kiện xảy ra, **Then** hệ thống gửi thông báo tương ứng cho Driver.              |
+
+---
+
+### 9. Operations & Reporting – Vận hành & Báo cáo
+
+| ID            | Acceptance Criteria                                                                                                                                             |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **AC-OPS-01** | **Given** Operations có quyền truy cập, **When** tra cứu Customer, **Then** hệ thống hiển thị thông tin Customer được phép xem.                                 |
+| **AC-OPS-02** | **Given** Operations có quyền truy cập, **When** tra cứu Driver, **Then** hệ thống hiển thị thông tin Driver.                                                   |
+| **AC-OPS-03** | **Given** Operations có quyền truy cập, **When** tra cứu phương tiện, **Then** hệ thống hiển thị thông tin phương tiện.                                         |
+| **AC-OPS-04** | **Given** Operations có quyền truy cập, **When** tra cứu chuyến đi, **Then** hệ thống hiển thị thông tin và trạng thái chuyến.                                  |
+| **AC-OPS-05** | **Given** có chuyến đang diễn ra, **When** Operations theo dõi chuyến, **Then** hệ thống hiển thị trạng thái chuyến và Driver liên quan.                        |
+| **AC-OPS-06** | **Given** có giao dịch thanh toán, **When** Operations tra cứu giao dịch, **Then** hệ thống hiển thị thông tin và trạng thái thanh toán.                        |
+| **AC-OPS-07** | **Given** hệ thống có dữ liệu chuyến đi, **When** Operations xem báo cáo, **Then** hệ thống cung cấp số chuyến, số lượng/tỷ lệ chuyến hoàn thành và chuyến hủy. |
+| **AC-OPS-08** | **Given** hệ thống có dữ liệu thanh toán, **When** Operations xem báo cáo doanh thu, **Then** hệ thống cung cấp dữ liệu doanh thu tương ứng.                    |
+| **AC-OPS-09** | **Given** hệ thống có dữ liệu hoạt động của Driver, **When** Operations xem báo cáo, **Then** hệ thống cung cấp thông tin phục vụ đánh giá hiệu quả Driver.     |
+| **AC-OPS-10** | **Given** một thao tác quan trọng được thực hiện trong hệ thống, **When** thao tác hoàn tất, **Then** hệ thống lưu vết để hỗ trợ kiểm tra và xử lý sự cố.       |
+
+---
+
+### 10. Acceptance Criteria cho các Business Rules chính
+
+| ID           | Acceptance Criteria                                                                                                  |
+| ------------ | -------------------------------------------------------------------------------------------------------------------- |
+| **AC-BR-01** | Mỗi Customer chỉ được có tối đa **01 chuyến active** tại một thời điểm.                                              |
+| **AC-BR-02** | Driver chỉ được đưa vào danh sách matching khi đang ở trạng thái `"Sẵn sàng"` và không có chuyến đang thực hiện.     |
+| **AC-BR-03** | Hệ thống chỉ tìm Driver trong bán kính tối đa **5 km** tính từ điểm đón.                                             |
+| **AC-BR-04** | Driver có tối đa **60 giây** để phản hồi một Ride Offer.                                                             |
+| **AC-BR-05** | Nếu Driver từ chối hoặc không phản hồi trong thời gian quy định, hệ thống phải tự động tìm Driver phù hợp tiếp theo. |
+| **AC-BR-06** | Customer hoặc Driver chỉ được hủy chuyến khi chuyến đang ở trạng thái `"Đang tìm tài xế"` hoặc `"Tài xế đang đến"`.  |
+| **AC-BR-07** | Khi chuyến đã `"Bắt đầu chuyến"` và chuyển sang `"Đang di chuyển"`, chức năng hủy chuyến phải bị vô hiệu hóa.        |
+| **AC-BR-08** | Nếu thanh toán điện tử thất bại, hệ thống không được ghi nhận giao dịch là đã hoàn tất.                              |
+| **AC-BR-09** | CAB System không lưu trực tiếp thông tin thanh toán nhạy cảm của Customer.                                           |
+
+---
+
+### 11. Lưu ý về quy tắc tính cước
+
+Hiện tại tài liệu có sự chưa thống nhất giữa Functional Requirements/Use Case và Business Rules:
+
+* Trong **Functional Requirements** và **Use Case Cập nhật trạng thái chuyến đi**, số tiền cước được mô tả là được chốt sau khi chuyến hoàn thành.
+* Trong **Business Rules**, giá cước được quy định là **tính và chốt cố định ngay tại thời điểm đặt xe**, dựa trên khoảng cách ước tính và đơn giá của loại xe.
+
+Do đó Acceptance Criteria cho chức năng tính cước cần được thống nhất sau khi lựa chọn một trong hai cách xử lý trên.
+
+Nếu áp dụng Business Rule hiện tại cho MVP, Acceptance Criteria đề xuất là:
+
+> **AC-FARE-01:** **Given** Customer đã nhập điểm đón, điểm đến và chọn loại xe, **When** hệ thống tính toán booking, **Then** giá cước được tính dựa trên khoảng cách ước tính và đơn giá loại xe, đồng thời được chốt cố định tại thời điểm đặt xe.
+
+> **AC-FARE-02:** **Given** giá cước của chuyến đã được chốt tại thời điểm đặt xe, **When** chuyến hoàn thành, **Then** hệ thống sử dụng giá đã chốt để thực hiện thanh toán và không tính lại cước dựa trên lộ trình thực tế.
+
