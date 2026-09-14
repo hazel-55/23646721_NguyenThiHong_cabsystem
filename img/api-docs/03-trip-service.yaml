@@ -1,0 +1,764 @@
+openapi: 3.0.3
+info:
+  title: CabSystem Trip Service API
+  version: 1.0.0
+  description: 'API quản lý Booking và vòng đời chuyến đi.
+
+
+    **Domain events**
+
+    - Publish: `TripRequested`, `TripCancelled`, `DriverArrived`, `TripStarted`, `TripCompleted`.
+
+    - Consume: `DriverAssigned`, `DispatchFailed`.
+
+
+    Trip Service sở hữu lịch sử chuyến và rating vì đây là dữ liệu gắn trực tiếp với Trip.'
+servers:
+- url: http://localhost:8080/api/v1
+  description: Local API Gateway
+tags:
+- name: Trips
+  description: Booking và vòng đời chuyến.
+- name: Ratings
+  description: Đánh giá sau chuyến.
+- name: Admin
+  description: Theo dõi vận hành và thống kê.
+paths:
+  /trips:
+    post:
+      tags:
+      - Trips
+      summary: Tạo yêu cầu đặt xe
+      operationId: createTrip
+      description: 'Tạo Trip ở trạng thái `REQUESTED`, sau đó publish `TripRequested` để Dispatch bắt đầu tìm tài xế.
+
+
+        **Roles:** CUSTOMER'
+      requestBody:
+        required: true
+        description: Payload JSON
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTripRequest'
+            example:
+              pickup:
+                latitude: 10.8
+                longitude: 106.7
+                address: Thủ Đức, TP.HCM
+              destination:
+                latitude: 10.775
+                longitude: 106.703
+                address: Quận Bình Thạnh, TP.HCM
+              vehicleType: CAR
+      responses:
+        '201':
+          description: Tạo chuyến thành công.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trip'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+      security:
+      - bearerAuth: []
+      x-roles:
+      - CUSTOMER
+  /trips/{tripId}:
+    get:
+      tags:
+      - Trips
+      summary: Xem chi tiết/theo dõi chuyến
+      operationId: getTrip
+      parameters:
+      - name: tripId
+        in: path
+        required: true
+        description: ID chuyến.
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Thông tin chuyến.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trip'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      security:
+      - bearerAuth: []
+      x-roles:
+      - CUSTOMER
+      - DRIVER
+      description: '**Roles:** CUSTOMER, DRIVER'
+  /trips/my:
+    get:
+      tags:
+      - Trips
+      summary: Xem lịch sử chuyến của người dùng hiện tại
+      operationId: getMyTrips
+      parameters:
+      - name: status
+        in: query
+        required: false
+        description: Lọc theo trạng thái.
+        schema:
+          $ref: '#/components/schemas/TripStatus'
+      - name: page
+        in: query
+        required: false
+        description: Trang.
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+      - name: size
+        in: query
+        required: false
+        description: Kích thước trang.
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+      responses:
+        '200':
+          description: Danh sách chuyến.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TripPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      security:
+      - bearerAuth: []
+      x-roles:
+      - CUSTOMER
+      - DRIVER
+      description: '**Roles:** CUSTOMER, DRIVER'
+  /trips/{tripId}/cancel:
+    post:
+      tags:
+      - Trips
+      summary: Hủy chuyến
+      operationId: cancelTrip
+      description: 'Cho phép hủy theo chính sách MVP. Không cho hủy khi Trip đã `COMPLETED`; các quy tắc hủy chi tiết được
+        kiểm tra ở service.
+
+
+        **Roles:** CUSTOMER'
+      parameters:
+      - name: tripId
+        in: path
+        required: true
+        description: ID chuyến.
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelTripRequest'
+            example:
+              reason: Thay đổi kế hoạch
+      responses:
+        '200':
+          description: Hủy chuyến thành công.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trip'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+      security:
+      - bearerAuth: []
+      x-roles:
+      - CUSTOMER
+  /trips/{tripId}/status:
+    patch:
+      tags:
+      - Trips
+      summary: Tài xế cập nhật trạng thái chuyến
+      operationId: updateTripStatus
+      description: 'Các transition hợp lệ trong MVP: `DRIVER_ASSIGNED -> DRIVER_ARRIVED -> IN_PROGRESS -> COMPLETED`.
+
+
+        **Roles:** DRIVER'
+      parameters:
+      - name: tripId
+        in: path
+        required: true
+        description: ID chuyến.
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        description: Payload JSON
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTripStatusRequest'
+            example:
+              status: DRIVER_ARRIVED
+      responses:
+        '200':
+          description: Cập nhật trạng thái thành công.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trip'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+      security:
+      - bearerAuth: []
+      x-roles:
+      - DRIVER
+  /trips/{tripId}/rating:
+    post:
+      tags:
+      - Ratings
+      summary: Customer đánh giá tài xế
+      operationId: rateDriver
+      description: 'Chỉ cho phép đánh giá Trip đã `COMPLETED`; mỗi Trip chỉ có một đánh giá từ Customer.
+
+
+        **Roles:** CUSTOMER'
+      parameters:
+      - name: tripId
+        in: path
+        required: true
+        description: ID chuyến.
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        description: Payload JSON
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RatingRequest'
+            example:
+              score: 5
+              comment: Tài xế thân thiện.
+      responses:
+        '201':
+          description: Đánh giá thành công.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rating'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+      security:
+      - bearerAuth: []
+      x-roles:
+      - CUSTOMER
+  /admin/trips:
+    get:
+      tags:
+      - Admin
+      summary: Admin tra cứu toàn bộ chuyến
+      operationId: adminGetTrips
+      parameters:
+      - name: status
+        in: query
+        required: false
+        description: Lọc trạng thái; dùng `IN_PROGRESS` để theo dõi chuyến đang chạy.
+        schema:
+          $ref: '#/components/schemas/TripStatus'
+      - name: customerId
+        in: query
+        required: false
+        description: Lọc Customer.
+        schema:
+          type: string
+          format: uuid
+      - name: driverId
+        in: query
+        required: false
+        description: Lọc Driver.
+        schema:
+          type: string
+          format: uuid
+      - name: page
+        in: query
+        required: false
+        description: Trang.
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+      - name: size
+        in: query
+        required: false
+        description: Kích thước trang.
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+      responses:
+        '200':
+          description: Danh sách chuyến.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TripPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      security:
+      - bearerAuth: []
+      x-roles:
+      - ADMIN
+      description: '**Roles:** ADMIN'
+  /admin/trips/{tripId}:
+    get:
+      tags:
+      - Admin
+      summary: Admin xem chi tiết chuyến
+      operationId: adminGetTrip
+      parameters:
+      - name: tripId
+        in: path
+        required: true
+        description: ID chuyến.
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Chi tiết chuyến.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trip'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      security:
+      - bearerAuth: []
+      x-roles:
+      - ADMIN
+      description: '**Roles:** ADMIN'
+  /admin/statistics/trips:
+    get:
+      tags:
+      - Admin
+      summary: Thống kê chuyến cơ bản
+      operationId: getTripStatistics
+      parameters:
+      - name: from
+        in: query
+        required: false
+        description: Ngày bắt đầu.
+        schema:
+          type: string
+          format: date
+        example: '2026-09-01'
+      - name: to
+        in: query
+        required: false
+        description: Ngày kết thúc.
+        schema:
+          type: string
+          format: date
+        example: '2026-09-30'
+      responses:
+        '200':
+          description: Thống kê chuyến.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TripStatistics'
+              example:
+                totalTrips: 120
+                completed: 96
+                cancelled: 18
+                noDriverFound: 6
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      security:
+      - bearerAuth: []
+      x-roles:
+      - ADMIN
+      description: '**Roles:** ADMIN'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 'JWT nhận từ Identity Service. Gửi theo dạng: Authorization: Bearer <token>.'
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+      - timestamp
+      - status
+      - errorCode
+      - message
+      - path
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          example: '2026-09-14T13:00:00+07:00'
+        status:
+          type: integer
+          example: 400
+        errorCode:
+          type: string
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          example: Dữ liệu đầu vào không hợp lệ.
+        path:
+          type: string
+          example: /api/v1/resource
+    PageMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+          minimum: 0
+          example: 0
+        size:
+          type: integer
+          minimum: 1
+          example: 20
+        totalElements:
+          type: integer
+          format: int64
+          example: 42
+        totalPages:
+          type: integer
+          example: 3
+    VehicleType:
+      type: string
+      enum:
+      - CAR
+      - MOTORBIKE
+    TripStatus:
+      type: string
+      enum:
+      - REQUESTED
+      - SEARCHING_DRIVER
+      - DRIVER_ASSIGNED
+      - DRIVER_ARRIVED
+      - IN_PROGRESS
+      - COMPLETED
+      - CANCELLED
+      - NO_DRIVER_FOUND
+    Point:
+      type: object
+      required:
+      - latitude
+      - longitude
+      - address
+      properties:
+        latitude:
+          type: number
+          format: double
+          example: 10.8
+        longitude:
+          type: number
+          format: double
+          example: 106.7
+        address:
+          type: string
+          example: Thủ Đức, TP.HCM
+    CreateTripRequest:
+      type: object
+      required:
+      - pickup
+      - destination
+      - vehicleType
+      properties:
+        pickup:
+          $ref: '#/components/schemas/Point'
+        destination:
+          $ref: '#/components/schemas/Point'
+        vehicleType:
+          $ref: '#/components/schemas/VehicleType'
+    Trip:
+      type: object
+      required:
+      - id
+      - customerId
+      - pickup
+      - destination
+      - vehicleType
+      - status
+      - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 55555555-5555-4555-8555-555555555555
+        customerId:
+          type: string
+          format: uuid
+          example: 11111111-1111-4111-8111-111111111111
+        driverId:
+          type: string
+          format: uuid
+          nullable: true
+          example: 33333333-3333-4333-8333-333333333333
+        pickup:
+          $ref: '#/components/schemas/Point'
+        destination:
+          $ref: '#/components/schemas/Point'
+        vehicleType:
+          $ref: '#/components/schemas/VehicleType'
+        status:
+          $ref: '#/components/schemas/TripStatus'
+        estimatedEtaMinutes:
+          type: integer
+          nullable: true
+          example: 6
+        fareAmount:
+          type: number
+          format: double
+          nullable: true
+          example: 85000
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+    CancelTripRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          maxLength: 255
+          example: Thay đổi kế hoạch
+    UpdateTripStatusRequest:
+      type: object
+      required:
+      - status
+      properties:
+        status:
+          type: string
+          enum:
+          - DRIVER_ARRIVED
+          - IN_PROGRESS
+          - COMPLETED
+    RatingRequest:
+      type: object
+      required:
+      - score
+      properties:
+        score:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 5
+        comment:
+          type: string
+          maxLength: 500
+          nullable: true
+          example: Tài xế thân thiện.
+    Rating:
+      type: object
+      required:
+      - id
+      - tripId
+      - customerId
+      - driverId
+      - score
+      - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        tripId:
+          type: string
+          format: uuid
+        customerId:
+          type: string
+          format: uuid
+        driverId:
+          type: string
+          format: uuid
+        score:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 5
+        comment:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+    TripPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Trip'
+        meta:
+          $ref: '#/components/schemas/PageMeta'
+    TripStatistics:
+      type: object
+      properties:
+        totalTrips:
+          type: integer
+          format: int64
+          example: 120
+        completed:
+          type: integer
+          format: int64
+          example: 96
+        cancelled:
+          type: integer
+          format: int64
+          example: 18
+        noDriverFound:
+          type: integer
+          format: int64
+          example: 6
+  responses:
+    BadRequest:
+      description: Yêu cầu không hợp lệ.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: '2026-09-14T13:00:00+07:00'
+            status: 400
+            errorCode: BAD_REQUEST
+            message: Yêu cầu không hợp lệ.
+            path: /api/v1/example
+    Unauthorized:
+      description: Thiếu hoặc JWT không hợp lệ.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: '2026-09-14T13:00:00+07:00'
+            status: 401
+            errorCode: UNAUTHORIZED
+            message: Thiếu hoặc JWT không hợp lệ.
+            path: /api/v1/example
+    Forbidden:
+      description: Không có quyền thực hiện chức năng này.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: '2026-09-14T13:00:00+07:00'
+            status: 403
+            errorCode: FORBIDDEN
+            message: Không có quyền thực hiện chức năng này.
+            path: /api/v1/example
+    NotFound:
+      description: Không tìm thấy tài nguyên.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: '2026-09-14T13:00:00+07:00'
+            status: 404
+            errorCode: NOT_FOUND
+            message: Không tìm thấy tài nguyên.
+            path: /api/v1/example
+    Conflict:
+      description: Xung đột trạng thái hoặc dữ liệu đã tồn tại.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: '2026-09-14T13:00:00+07:00'
+            status: 409
+            errorCode: CONFLICT
+            message: Xung đột trạng thái hoặc dữ liệu đã tồn tại.
+            path: /api/v1/example
+    UnprocessableEntity:
+      description: Yêu cầu hợp lệ về cú pháp nhưng không thỏa quy tắc nghiệp vụ.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: '2026-09-14T13:00:00+07:00'
+            status: 422
+            errorCode: BUSINESS_RULE_VIOLATION
+            message: Yêu cầu hợp lệ về cú pháp nhưng không thỏa quy tắc nghiệp vụ.
+            path: /api/v1/example
+    InternalError:
+      description: Lỗi nội bộ hệ thống.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: '2026-09-14T13:00:00+07:00'
+            status: 500
+            errorCode: INTERNAL_ERROR
+            message: Lỗi nội bộ hệ thống.
+            path: /api/v1/example

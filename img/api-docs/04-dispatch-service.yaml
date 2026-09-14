@@ -1,0 +1,380 @@
+openapi: 3.0.3
+info:
+  title: CabSystem Dispatch Service API
+  version: 1.0.0
+  description: 'API cho Driver Matching và Dispatch.
+
+
+    **Luồng nội bộ**
+
+    1. Consume `TripRequested` từ RabbitMQ.
+
+    2. Gọi Driver Service để lấy tài xế `AVAILABLE` đúng `vehicleType`.
+
+    3. Xếp hạng theo khoảng cách.
+
+    4. Tạo từng `RideOffer` theo thứ tự ưu tiên.
+
+    5. Driver accept/reject; nếu reject/timeout thì thử tài xế tiếp theo.
+
+    6. Publish `DriverAssigned` hoặc `DispatchFailed`.
+
+
+    Các tham số như thời gian timeout được cấu hình, không hard-code trong đặc tả API.'
+servers:
+- url: http://localhost:8080/api/v1
+  description: Local API Gateway
+tags:
+- name: Ride Offers
+  description: API Driver xem và phản hồi Ride Offer.
+paths:
+  /dispatch/offers/me:
+    get:
+      tags:
+      - Ride Offers
+      summary: Xem Ride Offer của tài xế hiện tại
+      operationId: getMyRideOffers
+      parameters:
+      - name: status
+        in: query
+        required: false
+        description: Lọc trạng thái; mặc định client thường lấy `PENDING`.
+        schema:
+          $ref: '#/components/schemas/OfferStatus'
+      - name: page
+        in: query
+        required: false
+        description: Trang.
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+      - name: size
+        in: query
+        required: false
+        description: Kích thước trang.
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 20
+      responses:
+        '200':
+          description: Danh sách Ride Offer.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OfferPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      security:
+      - bearerAuth: []
+      x-roles:
+      - DRIVER
+      description: '**Roles:** DRIVER'
+  /dispatch/offers/{offerId}/accept:
+    post:
+      tags:
+      - Ride Offers
+      summary: Chấp nhận Ride Offer
+      operationId: acceptRideOffer
+      description: 'Chỉ offer `PENDING` và chưa hết hạn mới được accept. Khi thành công, Dispatch publish `DriverAssigned`.
+
+
+        **Roles:** DRIVER'
+      parameters:
+      - name: offerId
+        in: path
+        required: true
+        description: ID Ride Offer.
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Chấp nhận offer thành công.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AcceptOfferResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+      security:
+      - bearerAuth: []
+      x-roles:
+      - DRIVER
+  /dispatch/offers/{offerId}/reject:
+    post:
+      tags:
+      - Ride Offers
+      summary: Từ chối Ride Offer
+      operationId: rejectRideOffer
+      description: 'Sau khi reject, Dispatch tiếp tục thử tài xế tiếp theo nếu còn ứng viên.
+
+
+        **Roles:** DRIVER'
+      parameters:
+      - name: offerId
+        in: path
+        required: true
+        description: ID Ride Offer.
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RejectOfferRequest'
+            example:
+              reason: Không thuận tiện nhận chuyến
+      responses:
+        '200':
+          description: Từ chối offer thành công.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RideOffer'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+      security:
+      - bearerAuth: []
+      x-roles:
+      - DRIVER
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 'JWT nhận từ Identity Service. Gửi theo dạng: Authorization: Bearer <token>.'
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+      - timestamp
+      - status
+      - errorCode
+      - message
+      - path
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          example: '2026-09-14T13:00:00+07:00'
+        status:
+          type: integer
+          example: 400
+        errorCode:
+          type: string
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          example: Dữ liệu đầu vào không hợp lệ.
+        path:
+          type: string
+          example: /api/v1/resource
+    PageMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+          minimum: 0
+          example: 0
+        size:
+          type: integer
+          minimum: 1
+          example: 20
+        totalElements:
+          type: integer
+          format: int64
+          example: 42
+        totalPages:
+          type: integer
+          example: 3
+    OfferStatus:
+      type: string
+      enum:
+      - PENDING
+      - ACCEPTED
+      - REJECTED
+      - EXPIRED
+    VehicleType:
+      type: string
+      enum:
+      - CAR
+      - MOTORBIKE
+    RideOffer:
+      type: object
+      required:
+      - id
+      - tripId
+      - driverId
+      - status
+      - expiresAt
+      - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 66666666-6666-4666-8666-666666666666
+        tripId:
+          type: string
+          format: uuid
+          example: 55555555-5555-4555-8555-555555555555
+        driverId:
+          type: string
+          format: uuid
+          example: 33333333-3333-4333-8333-333333333333
+        status:
+          $ref: '#/components/schemas/OfferStatus'
+        pickupAddress:
+          type: string
+          example: Thủ Đức, TP.HCM
+        destinationAddress:
+          type: string
+          example: Quận Bình Thạnh, TP.HCM
+        vehicleType:
+          $ref: '#/components/schemas/VehicleType'
+        distanceToPickupKm:
+          type: number
+          format: double
+          example: 1.8
+        expiresAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+    AcceptOfferResponse:
+      type: object
+      required:
+      - offer
+      - assignmentStatus
+      properties:
+        offer:
+          $ref: '#/components/schemas/RideOffer'
+        assignmentStatus:
+          type: string
+          enum:
+          - ASSIGNED
+          example: ASSIGNED
+    RejectOfferRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          maxLength: 255
+          nullable: true
+          example: Không thuận tiện nhận chuyến
+    OfferPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/RideOffer'
+        meta:
+          $ref: '#/components/schemas/PageMeta'
+  responses:
+    BadRequest:
+      description: Yêu cầu không hợp lệ.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: '2026-09-14T13:00:00+07:00'
+            status: 400
+            errorCode: BAD_REQUEST
+            message: Yêu cầu không hợp lệ.
+            path: /api/v1/example
+    Unauthorized:
+      description: Thiếu hoặc JWT không hợp lệ.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: '2026-09-14T13:00:00+07:00'
+            status: 401
+            errorCode: UNAUTHORIZED
+            message: Thiếu hoặc JWT không hợp lệ.
+            path: /api/v1/example
+    Forbidden:
+      description: Không có quyền thực hiện chức năng này.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: '2026-09-14T13:00:00+07:00'
+            status: 403
+            errorCode: FORBIDDEN
+            message: Không có quyền thực hiện chức năng này.
+            path: /api/v1/example
+    NotFound:
+      description: Không tìm thấy tài nguyên.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: '2026-09-14T13:00:00+07:00'
+            status: 404
+            errorCode: NOT_FOUND
+            message: Không tìm thấy tài nguyên.
+            path: /api/v1/example
+    Conflict:
+      description: Xung đột trạng thái hoặc dữ liệu đã tồn tại.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: '2026-09-14T13:00:00+07:00'
+            status: 409
+            errorCode: CONFLICT
+            message: Xung đột trạng thái hoặc dữ liệu đã tồn tại.
+            path: /api/v1/example
+    UnprocessableEntity:
+      description: Yêu cầu hợp lệ về cú pháp nhưng không thỏa quy tắc nghiệp vụ.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: '2026-09-14T13:00:00+07:00'
+            status: 422
+            errorCode: BUSINESS_RULE_VIOLATION
+            message: Yêu cầu hợp lệ về cú pháp nhưng không thỏa quy tắc nghiệp vụ.
+            path: /api/v1/example
+    InternalError:
+      description: Lỗi nội bộ hệ thống.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: '2026-09-14T13:00:00+07:00'
+            status: 500
+            errorCode: INTERNAL_ERROR
+            message: Lỗi nội bộ hệ thống.
+            path: /api/v1/example

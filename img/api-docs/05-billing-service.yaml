@@ -1,0 +1,627 @@
+openapi: 3.0.3
+info:
+  title: CabSystem Billing Service API
+  version: 1.0.0
+  description: 'API cho Fare và Payment.
+
+
+    **Domain events**
+
+    - Consume `TripCompleted` để tính cước và tạo Fare.
+
+    - Publish `PaymentSucceeded` / `PaymentFailed` sau khi xử lý thanh toán.
+
+
+    Trong MVP, phương thức `ELECTRONIC` có thể kết nối mock payment provider; `CASH` được ghi nhận trực tiếp theo nghiệp vụ.'
+servers:
+- url: http://localhost:8080/api/v1
+  description: Local API Gateway
+tags:
+- name: Fare
+  description: Tra cứu cước của chuyến.
+- name: Payment
+  description: Tạo/xử lý/retry thanh toán.
+- name: Admin
+  description: Tra cứu giao dịch và doanh thu.
+paths:
+  /billing/trips/{tripId}/fare:
+    get:
+      tags:
+      - Fare
+      summary: Xem cước của chuyến đã hoàn thành
+      operationId: getTripFare
+      parameters:
+      - name: tripId
+        in: path
+        required: true
+        description: ID chuyến.
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Thông tin cước.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Fare'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      security:
+      - bearerAuth: []
+      x-roles:
+      - CUSTOMER
+      - DRIVER
+      description: '**Roles:** CUSTOMER, DRIVER'
+  /billing/trips/{tripId}/payments:
+    post:
+      tags:
+      - Payment
+      summary: Chọn phương thức và tạo payment
+      operationId: createPayment
+      parameters:
+      - name: tripId
+        in: path
+        required: true
+        description: ID chuyến.
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        description: Payload JSON
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentRequest'
+            example:
+              method: ELECTRONIC
+      responses:
+        '201':
+          description: Tạo payment thành công.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+      security:
+      - bearerAuth: []
+      x-roles:
+      - CUSTOMER
+      description: '**Roles:** CUSTOMER'
+  /billing/payments/{paymentId}:
+    get:
+      tags:
+      - Payment
+      summary: Xem trạng thái payment
+      operationId: getPayment
+      parameters:
+      - name: paymentId
+        in: path
+        required: true
+        description: ID payment.
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Thông tin payment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      security:
+      - bearerAuth: []
+      x-roles:
+      - CUSTOMER
+      - DRIVER
+      description: '**Roles:** CUSTOMER, DRIVER'
+  /billing/payments/{paymentId}/process:
+    post:
+      tags:
+      - Payment
+      summary: Xử lý payment
+      operationId: processPayment
+      description: 'CASH: ghi nhận theo nghiệp vụ MVP. ELECTRONIC: gửi sang mock/payment provider và cập nhật SUCCESS/FAILED.
+
+
+        **Roles:** CUSTOMER, DRIVER'
+      parameters:
+      - name: paymentId
+        in: path
+        required: true
+        description: ID payment.
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Đã xử lý payment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      security:
+      - bearerAuth: []
+      x-roles:
+      - CUSTOMER
+      - DRIVER
+  /billing/payments/{paymentId}/retry:
+    post:
+      tags:
+      - Payment
+      summary: Retry payment thất bại
+      operationId: retryPayment
+      description: 'Chỉ payment trạng thái `FAILED` mới được retry.
+
+
+        **Roles:** CUSTOMER'
+      parameters:
+      - name: paymentId
+        in: path
+        required: true
+        description: ID payment.
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Kết quả retry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+      security:
+      - bearerAuth: []
+      x-roles:
+      - CUSTOMER
+  /admin/payments:
+    get:
+      tags:
+      - Admin
+      summary: Admin tra cứu giao dịch
+      operationId: adminGetPayments
+      parameters:
+      - name: status
+        in: query
+        required: false
+        description: Lọc trạng thái.
+        schema:
+          $ref: '#/components/schemas/PaymentStatus'
+      - name: method
+        in: query
+        required: false
+        description: Lọc phương thức.
+        schema:
+          $ref: '#/components/schemas/PaymentMethod'
+      - name: tripId
+        in: query
+        required: false
+        description: Lọc theo Trip.
+        schema:
+          type: string
+          format: uuid
+      - name: page
+        in: query
+        required: false
+        description: Trang.
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+      - name: size
+        in: query
+        required: false
+        description: Kích thước trang.
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+      responses:
+        '200':
+          description: Danh sách payment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      security:
+      - bearerAuth: []
+      x-roles:
+      - ADMIN
+      description: '**Roles:** ADMIN'
+  /admin/payments/{paymentId}:
+    get:
+      tags:
+      - Admin
+      summary: Admin xem chi tiết giao dịch
+      operationId: adminGetPayment
+      parameters:
+      - name: paymentId
+        in: path
+        required: true
+        description: ID payment.
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Chi tiết payment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      security:
+      - bearerAuth: []
+      x-roles:
+      - ADMIN
+      description: '**Roles:** ADMIN'
+  /admin/statistics/revenue:
+    get:
+      tags:
+      - Admin
+      summary: Thống kê doanh thu
+      operationId: getRevenueStatistics
+      parameters:
+      - name: from
+        in: query
+        required: false
+        description: Ngày bắt đầu.
+        schema:
+          type: string
+          format: date
+        example: '2026-09-01'
+      - name: to
+        in: query
+        required: false
+        description: Ngày kết thúc.
+        schema:
+          type: string
+          format: date
+        example: '2026-09-30'
+      responses:
+        '200':
+          description: Thống kê doanh thu.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevenueStatistics'
+              example:
+                from: '2026-09-01'
+                to: '2026-09-30'
+                successfulPayments: 96
+                revenue: 12500000
+                currency: VND
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      security:
+      - bearerAuth: []
+      x-roles:
+      - ADMIN
+      description: '**Roles:** ADMIN'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 'JWT nhận từ Identity Service. Gửi theo dạng: Authorization: Bearer <token>.'
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+      - timestamp
+      - status
+      - errorCode
+      - message
+      - path
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          example: '2026-09-14T13:00:00+07:00'
+        status:
+          type: integer
+          example: 400
+        errorCode:
+          type: string
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          example: Dữ liệu đầu vào không hợp lệ.
+        path:
+          type: string
+          example: /api/v1/resource
+    PageMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+          minimum: 0
+          example: 0
+        size:
+          type: integer
+          minimum: 1
+          example: 20
+        totalElements:
+          type: integer
+          format: int64
+          example: 42
+        totalPages:
+          type: integer
+          example: 3
+    FareStatus:
+      type: string
+      enum:
+      - CALCULATED
+      - FINALIZED
+    PaymentMethod:
+      type: string
+      enum:
+      - CASH
+      - ELECTRONIC
+    PaymentStatus:
+      type: string
+      enum:
+      - PENDING
+      - SUCCESS
+      - FAILED
+    Fare:
+      type: object
+      required:
+      - id
+      - tripId
+      - amount
+      - currency
+      - status
+      - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 77777777-7777-4777-8777-777777777777
+        tripId:
+          type: string
+          format: uuid
+          example: 55555555-5555-4555-8555-555555555555
+        distanceKm:
+          type: number
+          format: double
+          example: 8.2
+        amount:
+          type: number
+          format: double
+          example: 85000
+        currency:
+          type: string
+          example: VND
+        status:
+          $ref: '#/components/schemas/FareStatus'
+        createdAt:
+          type: string
+          format: date-time
+    CreatePaymentRequest:
+      type: object
+      required:
+      - method
+      properties:
+        method:
+          $ref: '#/components/schemas/PaymentMethod'
+    Payment:
+      type: object
+      required:
+      - id
+      - tripId
+      - fareId
+      - method
+      - amount
+      - currency
+      - status
+      - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 88888888-8888-4888-8888-888888888888
+        tripId:
+          type: string
+          format: uuid
+          example: 55555555-5555-4555-8555-555555555555
+        fareId:
+          type: string
+          format: uuid
+          example: 77777777-7777-4777-8777-777777777777
+        method:
+          $ref: '#/components/schemas/PaymentMethod'
+        amount:
+          type: number
+          format: double
+          example: 85000
+        currency:
+          type: string
+          example: VND
+        status:
+          $ref: '#/components/schemas/PaymentStatus'
+        providerTransactionId:
+          type: string
+          nullable: true
+          example: MOCK-TXN-20260914-0001
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    PaymentPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Payment'
+        meta:
+          $ref: '#/components/schemas/PageMeta'
+    RevenueStatistics:
+      type: object
+      properties:
+        from:
+          type: string
+          format: date
+          example: '2026-09-01'
+        to:
+          type: string
+          format: date
+          example: '2026-09-30'
+        successfulPayments:
+          type: integer
+          format: int64
+          example: 96
+        revenue:
+          type: number
+          format: double
+          example: 12500000
+        currency:
+          type: string
+          example: VND
+  responses:
+    BadRequest:
+      description: Yêu cầu không hợp lệ.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: '2026-09-14T13:00:00+07:00'
+            status: 400
+            errorCode: BAD_REQUEST
+            message: Yêu cầu không hợp lệ.
+            path: /api/v1/example
+    Unauthorized:
+      description: Thiếu hoặc JWT không hợp lệ.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: '2026-09-14T13:00:00+07:00'
+            status: 401
+            errorCode: UNAUTHORIZED
+            message: Thiếu hoặc JWT không hợp lệ.
+            path: /api/v1/example
+    Forbidden:
+      description: Không có quyền thực hiện chức năng này.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: '2026-09-14T13:00:00+07:00'
+            status: 403
+            errorCode: FORBIDDEN
+            message: Không có quyền thực hiện chức năng này.
+            path: /api/v1/example
+    NotFound:
+      description: Không tìm thấy tài nguyên.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: '2026-09-14T13:00:00+07:00'
+            status: 404
+            errorCode: NOT_FOUND
+            message: Không tìm thấy tài nguyên.
+            path: /api/v1/example
+    Conflict:
+      description: Xung đột trạng thái hoặc dữ liệu đã tồn tại.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: '2026-09-14T13:00:00+07:00'
+            status: 409
+            errorCode: CONFLICT
+            message: Xung đột trạng thái hoặc dữ liệu đã tồn tại.
+            path: /api/v1/example
+    UnprocessableEntity:
+      description: Yêu cầu hợp lệ về cú pháp nhưng không thỏa quy tắc nghiệp vụ.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: '2026-09-14T13:00:00+07:00'
+            status: 422
+            errorCode: BUSINESS_RULE_VIOLATION
+            message: Yêu cầu hợp lệ về cú pháp nhưng không thỏa quy tắc nghiệp vụ.
+            path: /api/v1/example
+    InternalError:
+      description: Lỗi nội bộ hệ thống.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: '2026-09-14T13:00:00+07:00'
+            status: 500
+            errorCode: INTERNAL_ERROR
+            message: Lỗi nội bộ hệ thống.
+            path: /api/v1/example
